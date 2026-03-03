@@ -1,8 +1,7 @@
-import { PrismaClient, AgentStatus } from '@prisma/client';
+import { AgentStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { AGENT_CONFIG } from '../lib/config';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 interface AgentCredential {
   id: string;
