@@ -6,3 +6,158 @@ datasource db {
   provider = "postgresql"
   schemas  = ["openclaw_mission_control"]
 }
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum AgentStatus {
+  ACTIVE
+  WORKING
+  IDLE
+  OFFLINE
+
+  @@schema("openclaw_mission_control")
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+
+  @@schema("openclaw_mission_control")
+}
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+
+  @@schema("openclaw_mission_control")
+}
+
+enum WorkLogAction {
+  PICKED
+  PROGRESS
+  BLOCKED
+  COMPLETED
+  DROPPED
+
+  @@schema("openclaw_mission_control")
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model Agent {
+  id         String      @id @default(cuid())
+  name       String
+  emoji      String?
+  role       String?
+  focus      String?
+  /// Hashed API key for authentication (use bcrypt or similar)
+  apiKeyHash String      @unique @map("api_key_hash")
+  status     AgentStatus
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Relations - Tasks
+  assignedTasks Task[]    @relation("TaskAssignee")
+  createdTasks  Task[]    @relation("TaskCreator")
+  comments      Comment[]
+  workLogs      WorkLog[]
+
+  // Relations - Mentions
+  mentionsAsSource Mention[] @relation("MentionSource")
+  mentionsAsTarget Mention[] @relation("MentionTarget")
+
+  @@index([status])
+  @@schema("openclaw_mission_control")
+}
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?      @db.Text
+  status       TaskStatus
+  priority     TaskPriority
+  tags         String[]
+  deliverables String[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations - Agents
+  assigneeId String?
+  assignee   Agent?  @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creatorId  String
+  creator    Agent   @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+
+  // Relations - Other
+  comments Comment[]
+  workLogs WorkLog[]
+  mentions Mention[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([creatorId])
+  @@schema("openclaw_mission_control")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  // Relations
+  taskId   String
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId String
+  author   Agent  @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+  @@index([authorId])
+  @@schema("openclaw_mission_control")
+}
+
+model WorkLog {
+  id        String        @id @default(cuid())
+  action    WorkLogAction
+  note      String?       @db.Text
+  createdAt DateTime      @default(now())
+
+  // Relations
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@index([action])
+  @@index([taskId])
+  @@index([agentId])
+  @@schema("openclaw_mission_control")
+}
+
+model Mention {
+  id        String   @id @default(cuid())
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  taskId        String?
+  task          Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  targetAgentId String
+  targetAgent   Agent   @relation("MentionTarget", fields: [targetAgentId], references: [id], onDelete: Cascade)
+  sourceAgentId String
+  sourceAgent   Agent   @relation("MentionSource", fields: [sourceAgentId], references: [id], onDelete: Cascade)
+
+  @@index([read])
+  @@index([taskId])
+  @@index([targetAgentId])
+  @@index([sourceAgentId])
+  @@schema("openclaw_mission_control")
+}
