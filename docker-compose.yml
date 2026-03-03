@@ -41,6 +41,8 @@ services:
   # Mission Control Application
   # ---------------------------------------------------------------------------
   mission-control:
+    # Use GHCR image in production, build locally for development
+    image: ${DOCKER_IMAGE:-ghcr.io/nhantran522000/openclaw-mission-control:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -50,9 +52,12 @@ services:
         condition: service_healthy
     environment:
       # Database connection URL using environment variable for password
-      DATABASE_URL: "postgresql://nhan:${POSTGRES_PASSWORD}@postgres:5432/postgres"
+      DATABASE_URL: "postgresql://nhan:${POSTGRES_PASSWORD}@postgres:5432/postgres?schema=openclaw_mission_control"
       PORT: 3000
       NODE_ENV: production
+      # Application secrets
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
     ports:
       - "3000:3000"
     command: npm run start
