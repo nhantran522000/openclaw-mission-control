@@ -1,0 +1,96 @@
+# Docker Compose configuration for OpenClaw Mission Control
+# Production-ready setup with PostgreSQL, Application, and Caddy reverse proxy
+
+version: "3.8"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+# Dedicated bridge network for inter-service communication
+networks:
+  mission-control-network:
+    driver: bridge
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: nhan
+      # Password loaded from environment variable
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Check if PostgreSQL is ready to accept connections
+      test: ["CMD-SHELL", "pg_isready -U nhan -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mission-control-network
+
+  # ---------------------------------------------------------------------------
+  # Mission Control Application
+  # ---------------------------------------------------------------------------
+  mission-control:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database connection URL using environment variable for password
+      DATABASE_URL: "postgresql://nhan:${POSTGRES_PASSWORD}@postgres:5432/postgres"
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    command: npm run start
+    volumes:
+      # Persist local data directory for file storage
+      - ./data:/app/data
+    networks:
+      - mission-control-network
+
+  # ---------------------------------------------------------------------------
+  # Caddy Reverse Proxy (Automatic HTTPS)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Caddyfile configuration
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      # Persistent data for certificates and other Caddy data
+      - caddy_data:/data
+      # Configuration storage
+      - caddy_config:/config
+    depends_on:
+      - mission-control
+    networks:
+      - mission-control-network
+
+# =============================================================================
+# NAMED VOLUMES
+# =============================================================================
+# Persistent storage for services
+volumes:
+  # PostgreSQL data persistence
+  postgres_data:
+  # Caddy certificate and data storage
+  caddy_data:
+  # Caddy configuration storage
+  caddy_config:
