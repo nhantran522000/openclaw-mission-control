@@ -12,11 +12,13 @@ WORKDIR /app
 # Copy package files first for better layer caching
 COPY package.json package-lock.json ./
 
+# Copy Prisma schema before npm ci to enable postinstall hook
+COPY prisma ./prisma/
+
 # Install all dependencies (including devDependencies needed for Prisma generation)
 RUN npm ci
 
-# Copy Prisma schema and generate client
-COPY prisma ./prisma/
+# Generate Prisma client
 RUN npx prisma generate
 
 # ============================================
@@ -34,9 +36,6 @@ COPY . .
 # Set environment variable for build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Generate Prisma client again to ensure it's in the correct location
-RUN npx prisma generate
-
 # Build the Next.js application
 RUN npm run build
 
@@ -48,6 +47,9 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# Install libc6-compat for Prisma query engine
+RUN apk add --no-cache libc6-compat
+
 # Set production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -56,14 +58,23 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy the entire built application
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+# Copy package files and install production dependencies only
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
 
-# Copy Prisma schema and generated client for runtime
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Copy Prisma schema for runtime
+COPY prisma ./prisma/
+
+# Copy generated Prisma client from deps stage
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules/@prisma/client ./node_modules/@prisma/client
+
+# Copy built Next.js application
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+
+# Set proper ownership for all files
+RUN chown -R nextjs:nodejs /app
 
 # Switch to non-root user
 USER nextjs
