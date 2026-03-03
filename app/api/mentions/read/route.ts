@@ -1,47 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { markMentionsRead, markAllMentionsRead } from '@/lib/local-storage';
-import { AgentId } from '@/lib/types';
-import { AGENT_CONFIG } from '@/lib/config';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_AGENTS: AgentId[] = AGENT_CONFIG.agents.map(a => a.id);
+// Helper function to get authenticated agent from headers
+function getAuthenticatedAgent(request: NextRequest): { id: string; name: string } | null {
+  const agentId = request.headers.get('x-agent-id');
+  const agentName = request.headers.get('x-agent-name');
+  if (!agentId) return null;
+  return { id: agentId, name: agentName || 'Unknown' };
+}
 
 // POST /api/mentions/read - Mark mentions as read
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication
+    const authenticatedAgent = getAuthenticatedAgent(request);
+    if (!authenticatedAgent) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
-    const { agent, mentionIds, all } = body;
+    const { mentionIds } = body;
 
-    // Validate agent parameter
-    if (!agent || typeof agent !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'Agent is required' },
-        { status: 400 }
-      );
-    }
-
-    const agentId = agent.toLowerCase() as AgentId;
-    if (!VALID_AGENTS.includes(agentId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid agent ID' },
-        { status: 400 }
-      );
-    }
-
-    // If 'all' is true, mark all mentions as read for the agent
-    if (all === true) {
-      await markAllMentionsRead(agentId);
-      return NextResponse.json({
-        success: true,
-        message: `All mentions marked as read for ${agentId}`,
-      });
-    }
-
-    // Otherwise, mark specific mentions as read
+    // Validate mentionIds
     if (!mentionIds || !Array.isArray(mentionIds) || mentionIds.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Either mentionIds array or all: true is required' },
+        { success: false, error: 'mentionIds array is required' },
         { status: 400 }
       );
     }
@@ -54,11 +42,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await markMentionsRead(mentionIds);
+    // Only update mentions where the authenticated agent is the target
+    const result = await prisma.mention.updateMany({
+      where: {
+        id: {
+          in: mentionIds,
+        },
+        targetAgentId: authenticatedAgent.id,
+      },
+      data: {
+        read: true,
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      message: `${mentionIds.length} mention(s) marked as read`,
+      message: `${result.count} mention(s) marked as read`,
+      count: result.count,
     });
   } catch (error) {
     console.error('Error marking mentions as read:', error);

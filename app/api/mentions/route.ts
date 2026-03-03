@@ -1,41 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMentionsForAgent, serializeMention } from '@/lib/local-storage';
-import { AgentId } from '@/lib/types';
-import { AGENT_CONFIG } from '@/lib/config';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_AGENTS: AgentId[] = AGENT_CONFIG.agents.map(a => a.id);
+// Helper function to get authenticated agent from headers
+function getAuthenticatedAgent(request: NextRequest): { id: string; name: string } | null {
+  const agentId = request.headers.get('x-agent-id');
+  const agentName = request.headers.get('x-agent-name');
+  if (!agentId) return null;
+  return { id: agentId, name: agentName || 'Unknown' };
+}
 
-// GET /api/mentions?agent=leo - Get unread mentions for an agent
+// GET /api/mentions?agent={id} - Get unread mentions for an agent
 export async function GET(request: NextRequest) {
   try {
+    // Check authentication
+    const authenticatedAgent = getAuthenticatedAgent(request);
+    if (!authenticatedAgent) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const agent = searchParams.get('agent');
+    const agentId = searchParams.get('agent');
 
     // Validate agent parameter
-    if (!agent) {
+    if (!agentId) {
       return NextResponse.json(
         { success: false, error: 'Agent parameter is required' },
         { status: 400 }
       );
     }
 
-    const agentId = agent.toLowerCase() as AgentId;
-    if (!VALID_AGENTS.includes(agentId)) {
+    // Validate that the authenticated agent matches the requested agent ID
+    // (or you could add admin check here if needed)
+    if (authenticatedAgent.id !== agentId) {
       return NextResponse.json(
-        { success: false, error: 'Invalid agent ID' },
-        { status: 400 }
+        { success: false, error: 'You can only view your own mentions' },
+        { status: 403 }
       );
     }
 
-    // Get unread mentions for the agent
-    const mentions = await getMentionsForAgent(agentId, true);
+    // Get unread mentions for the agent with related task and source agent details
+    const mentions = await prisma.mention.findMany({
+      where: {
+        targetAgentId: agentId,
+        read: false,
+      },
+      include: {
+        task: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        sourceAgent: {
+          select: {
+            id: true,
+            name: true,
+            emoji: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Transform mentions for API response
+    const transformedMentions = mentions.map((mention) => ({
+      id: mention.id,
+      read: mention.read,
+      createdAt: mention.createdAt,
+      task: mention.task
+        ? {
+            id: mention.task.id,
+            title: mention.task.title,
+          }
+        : null,
+      sourceAgent: {
+        id: mention.sourceAgent.id,
+        name: mention.sourceAgent.name,
+        emoji: mention.sourceAgent.emoji,
+      },
+    }));
 
     return NextResponse.json({
       success: true,
-      mentions: mentions.map(serializeMention),
-      count: mentions.length,
+      mentions: transformedMentions,
+      count: transformedMentions.length,
     });
   } catch (error) {
     console.error('Error fetching mentions:', error);

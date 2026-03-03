@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { completeTask, serializeTask } from '@/lib/local-storage';
-import { AgentId } from '@/lib/types';
+import { prisma } from '@/lib/prisma';
+import { TaskStatus, WorkLogAction } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
+
+// Helper function to get authenticated agent from headers
+function getAuthenticatedAgent(request: NextRequest): { id: string; name: string } | null {
+  const agentId = request.headers.get('x-agent-id');
+  const agentName = request.headers.get('x-agent-name');
+  if (!agentId) return null;
+  return { id: agentId, name: agentName || 'Unknown' };
+}
+
+// Helper to convert Prisma enum to lowercase for API compatibility
+function serializeTaskStatus(status: TaskStatus): string {
+  return status.toLowerCase();
+}
+
+function serializeTaskPriority(priority: string): string {
+  return priority.toLowerCase();
+}
 
 // POST /api/tasks/[id]/complete - Agent marks task as done
 export async function POST(
@@ -10,58 +27,123 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await request.json();
-    const { agent, note, deliverable, deliverables } = body;
-
+    // Check authentication
+    const agent = getAuthenticatedAgent(request);
     if (!agent) {
       return NextResponse.json(
-        { success: false, error: 'Missing required field: agent' },
-        { status: 400 }
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
       );
     }
 
-    // Validate agent
-    const validAgents = ['shri', 'leo', 'nova', 'pixel', 'cipher', 'echo', 'forge'];
-    if (!validAgents.includes(agent)) {
+    const body = await request.json();
+    const { deliverables, summary } = body;
+
+    // Validate deliverables array
+    if (!deliverables || !Array.isArray(deliverables)) {
       return NextResponse.json(
-        { success: false, error: `Invalid agent. Must be one of: ${validAgents.join(', ')}` },
+        { success: false, error: 'Missing required field: deliverables (array)' },
         { status: 400 }
       );
     }
 
-    // Validate deliverable if provided (must be .md file) - backward compatibility
-    if (deliverable && typeof deliverable === 'string' && !deliverable.endsWith('.md')) {
-      return NextResponse.json(
-        { success: false, error: 'Deliverable must be a .md file' },
-        { status: 400 }
-      );
-    }
-
-    // Validate deliverables array if provided (all must be .md files)
-    if (deliverables && Array.isArray(deliverables)) {
-      for (const d of deliverables) {
-        if (typeof d === 'string' && !d.endsWith('.md')) {
-          return NextResponse.json(
-            { success: false, error: 'All deliverables must be .md files' },
-            { status: 400 }
-          );
-        }
+    // Validate all deliverables are .md files
+    for (const d of deliverables) {
+      if (typeof d === 'string' && !d.endsWith('.md')) {
+        return NextResponse.json(
+          { success: false, error: 'All deliverables must be .md files' },
+          { status: 400 }
+        );
       }
     }
 
-    const task = await completeTask(params.id, agent as AgentId, note, deliverables, deliverable);
+    // Check if task exists
+    const existingTask = await prisma.task.findUnique({
+      where: { id: params.id },
+    });
 
-    if (!task) {
+    if (!existingTask) {
       return NextResponse.json(
         { success: false, error: 'Task not found' },
         { status: 404 }
       );
     }
 
+    // Update task status to REVIEW and store deliverables
+    const task = await prisma.task.update({
+      where: { id: params.id },
+      data: {
+        status: TaskStatus.REVIEW,
+        deliverables: deliverables,
+      },
+      include: {
+        assignee: true,
+        creator: true,
+        comments: {
+          include: {
+            author: true,
+          },
+        },
+        workLogs: {
+          include: {
+            agent: true,
+          },
+        },
+      },
+    });
+
+    // Create WorkLog entry for COMPLETED action
+    await prisma.workLog.create({
+      data: {
+        taskId: params.id,
+        agentId: agent.id,
+        action: WorkLogAction.COMPLETED,
+        note: summary || `Task completed by ${agent.name}`,
+      },
+    });
+
+    // Serialize task for response
+    const serializedTask = {
+      id: task.id,
+      title: task.title,
+      description: task.description || '',
+      status: serializeTaskStatus(task.status),
+      priority: serializeTaskPriority(task.priority),
+      assignee: task.assignee
+        ? {
+            id: task.assignee.id,
+            name: task.assignee.name,
+            emoji: task.assignee.emoji,
+            role: task.assignee.role,
+          }
+        : null,
+      createdBy: task.creator.name,
+      creatorId: task.creatorId,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+      tags: task.tags,
+      deliverables: task.deliverables,
+      comments: task.comments.map((comment) => ({
+        id: comment.id,
+        author: comment.author.name,
+        authorId: comment.authorId,
+        content: comment.content,
+        createdAt: comment.createdAt.toISOString(),
+      })),
+      workLog: task.workLogs.map((log) => ({
+        id: log.id,
+        agent: log.agent.name,
+        agentId: log.agentId,
+        action: log.action.toLowerCase(),
+        note: log.note || '',
+        createdAt: log.createdAt.toISOString(),
+      })),
+    };
+
     return NextResponse.json({
       success: true,
-      task: serializeTask(task),
-      message: `Task completed by ${agent}`,
+      task: serializedTask,
+      message: `Task completed by ${agent.name}`,
     });
   } catch (error) {
     console.error('Error completing task:', error);

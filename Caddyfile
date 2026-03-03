@@ -38,47 +38,46 @@ http://localhost {
 }
 
 # -----------------------------------------------------------------------------
-# PRODUCTION CONFIGURATION (COMMENTED)
+# PRODUCTION CONFIGURATION - vogalingo.win
 # -----------------------------------------------------------------------------
-# Uncomment and modify the following block for production deployment.
-# Replace "your-domain.com" with your actual domain.
-#
-# your-domain.com {
-#     # Reverse proxy to the mission-control service
-#     reverse_proxy mission-control:3000
-#
-#     # Enable compression
-#     encode gzip zstd
-#
-#     # Security headers for production
-#     header {
-#         # Prevent clickjacking
-#         X-Frame-Options "SAMEORIGIN"
-#         # Prevent MIME-type sniffing
-#         X-Content-Type-Options "nosniff"
-#         # Enable XSS protection
-#         X-XSS-Protection "1; mode=block"
-#         # Referrer policy
-#         Referrer-Policy "strict-origin-when-cross-origin"
-#         # Content Security Policy - adjust as needed for your application
-#         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';"
-#         # HTTP Strict Transport Security (HSTS)
-#         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-#         # Remove server information
-#         -Server
-#     }
-#
-#     # Logging for production
-#     log {
-#         output stdout
-#         format json
-#     }
-# }
-#
-# # Optional: Redirect www to non-www (or vice versa)
-# www.your-domain.com {
-#     redir https://your-domain.com{uri} permanent
-# }
+# Caddy automatically handles:
+# - HTTP to HTTPS redirect
+# - SSL certificate provisioning and renewal via Let's Encrypt
+# - WebSocket connections for Next.js HMR (handled by reverse_proxy)
+
+vogalingo.win {
+    # Reverse proxy to the mission-control Next.js application
+    # WebSocket support is automatic with Caddy's reverse_proxy
+    reverse_proxy mission-control:3000
+
+    # Enable compression for better performance
+    encode gzip zstd
+
+    # Security headers
+    header {
+        # Prevent clickjacking attacks
+        X-Frame-Options "SAMEORIGIN"
+        # Prevent MIME-type sniffing
+        X-Content-Type-Options "nosniff"
+        # Enable XSS protection in browsers
+        X-XSS-Protection "1; mode=block"
+        # Control referrer information
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Remove server information for security
+        -Server
+    }
+
+    # Access logging
+    log {
+        output stdout
+        format json
+    }
+}
+
+# Redirect www to non-www
+www.vogalingo.win {
+    redir https://vogalingo.win{uri} permanent
+}
 
 # -----------------------------------------------------------------------------
 # ADDITIONAL NOTES
