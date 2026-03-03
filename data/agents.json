@@ -1,62 +1,92 @@
 [
   {
-    "id": "lead",
-    "name": "Lead",
-    "emoji": "🎯",
-    "role": "Team Lead",
-    "focus": "Strategy, task assignment",
+    "id": "server-admin",
+    "name": "Server Admin",
+    "emoji": "⚙️",
+    "role": "Orchestrator",
+    "focus": "Agent coordination, system administration",
     "status": "active",
     "currentTask": null,
-    "lastSeen": "2026-02-07T08:24:25.155Z"
+    "lastSeen": "2026-03-03T15:00:09.275Z"
   },
   {
-    "id": "writer",
-    "name": "Writer",
-    "emoji": "✍️",
-    "role": "Content",
-    "focus": "Blog posts, documentation",
+    "id": "devops",
+    "name": "DevOps",
+    "emoji": "🔧",
+    "role": "Operations",
+    "focus": "CI/CD, infrastructure, deployment",
     "status": "active",
     "currentTask": null,
-    "lastSeen": "2026-02-07T08:24:25.155Z"
+    "lastSeen": "2026-03-03T15:00:09.275Z"
   },
   {
-    "id": "growth",
-    "name": "Growth",
-    "emoji": "🚀",
-    "role": "Marketing",
-    "focus": "SEO, campaigns",
+    "id": "qa",
+    "name": "QA",
+    "emoji": "🔍",
+    "role": "Quality Assurance",
+    "focus": "Testing, quality checks",
     "status": "active",
     "currentTask": null,
-    "lastSeen": "2026-02-07T08:24:25.155Z"
+    "lastSeen": "2026-03-03T15:00:09.275Z"
   },
   {
-    "id": "dev",
-    "name": "Dev",
+    "id": "security",
+    "name": "Security",
+    "emoji": "🛡️",
+    "role": "Security",
+    "focus": "Security audits, vulnerability scanning",
+    "status": "active",
+    "currentTask": null,
+    "lastSeen": "2026-03-03T15:00:09.275Z"
+  },
+  {
+    "id": "dev-fullstack",
+    "name": "Fullstack Dev",
     "emoji": "💻",
     "role": "Engineering",
-    "focus": "Features, bugs, code",
+    "focus": "Frontend, backend, features",
     "status": "active",
     "currentTask": null,
-    "lastSeen": "2026-02-07T08:24:25.155Z"
+    "lastSeen": "2026-03-03T15:00:09.275Z"
   },
   {
-    "id": "ux",
-    "name": "UX",
-    "emoji": "🎨",
-    "role": "Product",
-    "focus": "Design, activation",
+    "id": "data-ai",
+    "name": "Data/AI",
+    "emoji": "🤖",
+    "role": "Data & AI",
+    "focus": "Machine learning, data analysis",
     "status": "active",
     "currentTask": null,
-    "lastSeen": "2026-02-07T08:24:25.155Z"
+    "lastSeen": "2026-03-03T15:00:09.275Z"
   },
   {
-    "id": "data",
-    "name": "Data",
+    "id": "ba",
+    "name": "BA",
+    "emoji": "📋",
+    "role": "Business Analyst",
+    "focus": "Requirements, analysis",
+    "status": "active",
+    "currentTask": null,
+    "lastSeen": "2026-03-03T15:00:09.275Z"
+  },
+  {
+    "id": "architect",
+    "name": "Architect",
+    "emoji": "🏗️",
+    "role": "Architecture",
+    "focus": "System design, architecture",
+    "status": "active",
+    "currentTask": null,
+    "lastSeen": "2026-03-03T15:00:09.275Z"
+  },
+  {
+    "id": "pm",
+    "name": "PM",
     "emoji": "📊",
-    "role": "Analytics",
-    "focus": "Metrics, reporting",
+    "role": "Project Manager",
+    "focus": "Project planning, management",
     "status": "active",
     "currentTask": null,
-    "lastSeen": "2026-02-07T08:24:25.155Z"
+    "lastSeen": "2026-03-03T15:00:09.275Z"
   }
 ]
