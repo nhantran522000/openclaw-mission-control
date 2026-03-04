@@ -40,12 +40,12 @@ http://localhost {
 # -----------------------------------------------------------------------------
 # PRODUCTION CONFIGURATION - vogalingo.win
 # -----------------------------------------------------------------------------
-# Caddy automatically handles:
-# - HTTP to HTTPS redirect
-# - SSL certificate provisioning and renewal via Let's Encrypt
-# - WebSocket connections for Next.js HMR (handled by reverse_proxy)
+# Due to firewall issues, using HTTP-only for now
+# SSL will be enabled once firewall is properly configured
+# 
+# Access via: http://vogalingo.win:8080 or http://localhost:8080
 
-vogalingo.win {
+vogalingo.win:8080 {
     # Reverse proxy to the mission-control Next.js application
     # WebSocket support is automatic with Caddy's reverse_proxy
     reverse_proxy mission-control:3000
@@ -75,8 +75,8 @@ vogalingo.win {
 }
 
 # Redirect www to non-www
-www.vogalingo.win {
-    redir https://vogalingo.win{uri} permanent
+www.vogalingo.win:8080 {
+    redir http://vogalingo.win:8080{uri} permanent
 }
 
 # -----------------------------------------------------------------------------
