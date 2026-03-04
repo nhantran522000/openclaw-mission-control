@@ -166,10 +166,41 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Debug - Check secrets and SSH setup
+        run: |
+          echo "=== Checking SERVER_HOST secret ==="
+          if [ -z "${{ secrets.SERVER_HOST }}" ]; then
+            echo "❌ ERROR: SERVER_HOST secret is EMPTY or NOT SET"
+            echo "Please set the SERVER_HOST secret in GitHub repository settings"
+          else
+            echo "✅ SERVER_HOST is set (length: $(echo -n '${{ secrets.SERVER_HOST }}' | wc -c) chars)"
+          fi
+          
+          echo ""
+          echo "=== Checking SSH Agent ==="
+          if [ -n "$SSH_AUTH_SOCK" ]; then
+            echo "✅ SSH_AUTH_SOCK is set: $SSH_AUTH_SOCK"
+            ssh-add -l || echo "No identities loaded"
+          else
+            echo "❌ SSH_AUTH_SOCK is not set"
+          fi
+          
+          echo ""
+          echo "=== Testing server connectivity ==="
+          if [ -n "${{ secrets.SERVER_HOST }}" ]; then
+            echo "Testing connection to server..."
+            timeout 10 bash -c "cat < /dev/null > /dev/tcp/${{ secrets.SERVER_HOST }}/22" && echo "✅ Port 22 is open" || echo "❌ Cannot connect to port 22"
+          fi
+
       - name: Add server to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          echo "Running ssh-keyscan..."
+          ssh-keyscan -v ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>&1 || {
+            echo "❌ ssh-keyscan failed"
+            exit 1
+          }
+          echo "✅ Server added to known hosts"
 
       - name: Deploy via SSH
         run: |
