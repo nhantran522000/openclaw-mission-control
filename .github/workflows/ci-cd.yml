@@ -166,82 +166,46 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Debug - Check secrets and SSH setup
+      - name: Install Tailscale
         run: |
-          echo "=== Checking SERVER_HOST secret ==="
-          if [ -z "${{ secrets.SERVER_HOST }}" ]; then
-            echo "❌ ERROR: SERVER_HOST secret is EMPTY or NOT SET"
-            echo "Please set the SERVER_HOST secret in GitHub repository settings"
-          else
-            echo "✅ SERVER_HOST is set (length: $(echo -n '${{ secrets.SERVER_HOST }}' | wc -c) chars)"
-          fi
-          
+          echo "=== Installing Tailscale ==="
+          curl -fsSL https://tailscale.com/install.sh | sh
+          echo "✅ Tailscale installed"
+
+      - name: Connect to Tailscale
+        run: |
+          echo "=== Connecting to Tailscale network ==="
+          sudo tailscale up --authkey="${{ secrets.TAILSCALE_AUTH_KEY }}" --accept-routes
+          echo "✅ Connected to Tailscale"
           echo ""
-          echo "=== Checking SSH Agent ==="
-          if [ -n "$SSH_AUTH_SOCK" ]; then
-            echo "✅ SSH_AUTH_SOCK is set: $SSH_AUTH_SOCK"
-            ssh-add -l || echo "No identities loaded"
-          else
-            echo "❌ SSH_AUTH_SOCK is not set"
-          fi
-          
-          echo ""
-          echo "=== Testing server connectivity ==="
-          if [ -n "${{ secrets.SERVER_HOST }}" ]; then
-            echo "Testing connection to server..."
-            timeout 10 bash -c "cat < /dev/null > /dev/tcp/${{ secrets.SERVER_HOST }}/22" && echo "✅ Port 22 is open" || echo "❌ Cannot connect to port 22"
-          fi
+          echo "=== Tailscale Status ==="
+          tailscale status
 
       - name: Add server to known hosts
-        id: ssh-keyscan
         run: |
           mkdir -p ~/.ssh
-          echo "Running ssh-keyscan for server..."
-          
-          # Capture both output and errors
-          if ! ssh-keyscan -v ${{ secrets.SERVER_HOST }} 2>&1 | tee /tmp/keyscan_output.txt >> ~/.ssh/known_hosts; then
-            echo ""
-            echo "❌ ssh-keyscan failed!"
-            echo ""
-            echo "=== ssh-keyscan output ==="
-            cat /tmp/keyscan_output.txt
-            echo "=== end output ==="
-            exit 1
-          fi
-          
-          echo "✅ Server added to known hosts"
+          echo "Adding server to known_hosts..."
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "✅ Known hosts configured"
 
-      - name: Debug - Test SSH connection
+      - name: Test SSH connection via Tailscale
         run: |
           echo "=== Testing SSH connection ==="
-          echo "Server: ${{ secrets.SERVER_HOST }}"
+          echo "Server (Tailscale IP): ${{ secrets.SERVER_HOST }}"
           echo "User: ${{ secrets.SERVER_USER }}"
-          
           echo ""
-          echo "=== DNS Resolution ==="
-          nslookup ${{ secrets.SERVER_HOST }} || echo "DNS lookup failed"
-          
-          echo ""
-          echo "=== Network Reachability ==="
-          ping -c 3 ${{ secrets.SERVER_HOST }} || echo "Ping failed (may be blocked)"
-          
-          echo ""
-          echo "=== Port 22 Connectivity ==="
-          nc -zv -w 10 ${{ secrets.SERVER_HOST }} 22 || echo "Port 22 not reachable"
-          
-          echo ""
-          echo "=== SSH Verbose Connection Test ==="
-          timeout 30 ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo 'SSH connection successful'" || echo "SSH connection failed"
+          echo "=== Testing SSH ==="
+          timeout 30 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH connection successful'" || exit 1
 
       - name: Deploy via SSH
         run: |
-          # Copy docker-compose.yml with verbose output
+          # Copy docker-compose.yml
           echo "=== Copying docker-compose.yml ==="
-          scp -v -o StrictHostKeyChecking=no -o ConnectTimeout=30 docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
+          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
 
           # Deploy via SSH with environment variables from secrets
           echo "=== Starting deployment ==="
-          ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             set -x  # Echo commands for debugging
             cd ~/projects/openclaw-mission-control
 
