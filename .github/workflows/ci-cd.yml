@@ -211,18 +211,44 @@ jobs:
           
           echo "✅ Server added to known hosts"
 
+      - name: Debug - Test SSH connection
+        run: |
+          echo "=== Testing SSH connection ==="
+          echo "Server: ${{ secrets.SERVER_HOST }}"
+          echo "User: ${{ secrets.SERVER_USER }}"
+          
+          echo ""
+          echo "=== DNS Resolution ==="
+          nslookup ${{ secrets.SERVER_HOST }} || echo "DNS lookup failed"
+          
+          echo ""
+          echo "=== Network Reachability ==="
+          ping -c 3 ${{ secrets.SERVER_HOST }} || echo "Ping failed (may be blocked)"
+          
+          echo ""
+          echo "=== Port 22 Connectivity ==="
+          nc -zv -w 10 ${{ secrets.SERVER_HOST }} 22 || echo "Port 22 not reachable"
+          
+          echo ""
+          echo "=== SSH Verbose Connection Test ==="
+          timeout 30 ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo 'SSH connection successful'" || echo "SSH connection failed"
+
       - name: Deploy via SSH
         run: |
-          # Copy docker-compose.yml only (don't copy .env files - use secrets)
-          scp -o StrictHostKeyChecking=no docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
+          # Copy docker-compose.yml with verbose output
+          echo "=== Copying docker-compose.yml ==="
+          scp -v -o StrictHostKeyChecking=no -o ConnectTimeout=30 docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
 
           # Deploy via SSH with environment variables from secrets
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+          echo "=== Starting deployment ==="
+          ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+            set -x  # Echo commands for debugging
             cd ~/projects/openclaw-mission-control
 
-            # Pull latest image
+            echo "=== Pulling latest image ==="
             docker pull ghcr.io/nhantran522000/openclaw-mission-control:latest
 
+            echo "=== Restarting services ==="
             # Set environment variables and restart services
             POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
             ADMIN_API_KEY="${{ secrets.ADMIN_API_KEY }}" \
@@ -230,10 +256,10 @@ jobs:
             DOCKER_IMAGE=ghcr.io/nhantran522000/openclaw-mission-control \
             docker-compose up -d --force-recreate
 
-            # Run migrations
+            echo "=== Running migrations ==="
             docker-compose exec -T mission-control npx prisma migrate deploy
 
-            # Health check
+            echo "=== Health check ==="
             sleep 10
             docker-compose ps
           ENDSSH
