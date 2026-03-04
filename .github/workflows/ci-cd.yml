@@ -225,14 +225,14 @@ jobs:
             ADMIN_API_KEY="${{ secrets.ADMIN_API_KEY }}" \
             JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             DOCKER_IMAGE=ghcr.io/nhantran522000/openclaw-mission-control \
-            docker-compose up -d --force-recreate
+            docker compose up -d --force-recreate
 
             echo "=== Running migrations ==="
-            docker-compose exec -T mission-control npx prisma migrate deploy
+            docker compose exec -T mission-control npx prisma migrate deploy
 
             echo "=== Health check ==="
             sleep 10
-            docker-compose ps
+            docker compose ps
           ENDSSH
 
       - name: Verify deployment
