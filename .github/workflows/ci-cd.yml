@@ -17,7 +17,7 @@ on:
           - 'false'
 
 env:
-  DOCKER_IMAGE: ghcr.io/${{ github.repository }}/mission-control:latest
+  DOCKER_IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   # CI Job - Test and Build

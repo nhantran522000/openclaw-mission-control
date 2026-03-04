@@ -42,7 +42,7 @@ services:
   # ---------------------------------------------------------------------------
   mission-control:
     # Use GHCR image in production, build locally for development
-    image: ${DOCKER_IMAGE:-ghcr.io/nhantran522000/openclaw-mission-control:latest}
+    image: ${DOCKER_IMAGE:-ghcr.io/nhantran522000/openclaw-mission-control}
     build:
       context: .
       dockerfile: Dockerfile
