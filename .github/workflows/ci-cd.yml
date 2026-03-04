@@ -193,13 +193,22 @@ jobs:
           fi
 
       - name: Add server to known hosts
+        id: ssh-keyscan
         run: |
           mkdir -p ~/.ssh
-          echo "Running ssh-keyscan..."
-          ssh-keyscan -v ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>&1 || {
-            echo "❌ ssh-keyscan failed"
+          echo "Running ssh-keyscan for server..."
+          
+          # Capture both output and errors
+          if ! ssh-keyscan -v ${{ secrets.SERVER_HOST }} 2>&1 | tee /tmp/keyscan_output.txt >> ~/.ssh/known_hosts; then
+            echo ""
+            echo "❌ ssh-keyscan failed!"
+            echo ""
+            echo "=== ssh-keyscan output ==="
+            cat /tmp/keyscan_output.txt
+            echo "=== end output ==="
             exit 1
-          }
+          fi
+          
           echo "✅ Server added to known hosts"
 
       - name: Deploy via SSH
