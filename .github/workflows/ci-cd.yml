@@ -125,6 +125,7 @@ jobs:
             type=sha,prefix=
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -168,17 +169,21 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          # Copy docker-compose.yml and .env.production
-          scp -o StrictHostKeyChecking=no docker-compose.yml .env.production ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
+          # Copy docker-compose.yml only (don't copy .env files - use secrets)
+          scp -o StrictHostKeyChecking=no docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
 
-          # Pull latest image
+          # Deploy via SSH with environment variables from secrets
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             cd ~/projects/openclaw-mission-control
 
             # Pull latest image
             docker pull ghcr.io/nhantran522000/openclaw-mission-control:latest
 
-            # Restart services
+            # Set environment variables and restart services
+            POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+            ADMIN_API_KEY="${{ secrets.ADMIN_API_KEY }}" \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            DOCKER_IMAGE=ghcr.io/nhantran522000/openclaw-mission-control \
             docker-compose up -d --force-recreate
 
             # Run migrations
