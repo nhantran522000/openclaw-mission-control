@@ -195,17 +195,17 @@ jobs:
           echo "User: ${{ secrets.SERVER_USER }}"
           echo ""
           echo "=== Testing SSH ==="
-          timeout 30 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH connection successful'" || exit 1
+          timeout 30 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o IdentitiesOnly=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH connection successful'" || exit 1
 
       - name: Deploy via SSH
         run: |
           # Copy docker-compose.yml
           echo "=== Copying docker-compose.yml ==="
-          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
+          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o IdentitiesOnly=yes docker-compose.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/projects/openclaw-mission-control/
 
           # Deploy via SSH with environment variables from secrets
           echo "=== Starting deployment ==="
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o IdentitiesOnly=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'ENDSSH'
             set -x  # Echo commands for debugging
             cd ~/projects/openclaw-mission-control
 
