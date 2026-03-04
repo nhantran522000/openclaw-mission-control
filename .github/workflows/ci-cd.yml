@@ -190,11 +190,18 @@ jobs:
 
       - name: Test SSH connection via Tailscale
         run: |
-          echo "=== Testing SSH connection ==="
+          echo "=== Testing Tailscale Connectivity ==="
           echo "Server (Tailscale IP): ${{ secrets.SERVER_HOST }}"
-          echo "User: ${{ secrets.SERVER_USER }}"
+          echo ""
+          echo "=== Tailscale ping test ==="
+          timeout 5 tailscale ping ${{ secrets.SERVER_HOST }} 2>&1 || echo "Tailscale ping failed"
+          echo ""
+          echo "=== Network reachability test ==="
+          nc -zv -w 5 ${{ secrets.SERVER_HOST }} 22 2>&1 || echo "Port 22 not reachable"
           echo ""
           echo "=== Testing SSH ==="
+          echo "Server (Tailscale IP): ${{ secrets.SERVER_HOST }}"
+          echo "User: ${{ secrets.SERVER_USER }}"
           timeout 30 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o IdentitiesOnly=yes ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "echo '✅ SSH connection successful'" || exit 1
 
       - name: Deploy via SSH
